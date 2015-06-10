@@ -22,14 +22,14 @@ package halfshell
 
 import (
 	"fmt"
-	"io/ioutil"
-	"net/http"
-	"net/url"
-	"strings"
+	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/awserr"
+	"github.com/aws/aws-sdk-go/service/s3"
+	"os"
 	"time"
-
-	"github.com/oysterbooks/s3"
 )
+
+var S3Service *s3.S3 = s3.New(&aws.Config{Region: "us-east-1", Logger: os.Stdout, LogLevel: 0})
 
 const (
 	ImageSourceTypeS3 ImageSourceType = "s3"
@@ -48,49 +48,35 @@ func NewS3ImageSourceWithConfig(config *SourceConfig) ImageSource {
 }
 
 func (s *S3ImageSource) GetImage(request *ImageSourceOptions) (*Image, error) {
-	httpRequest := s.signedHTTPRequestForRequest(request)
-	httpResponse, err := http.DefaultClient.Do(httpRequest)
-	defer httpResponse.Body.Close()
+
+	start := time.Now()
+	params := &s3.GetObjectInput{Bucket: aws.String(s.Config.S3Bucket), Key: aws.String(request.Path)}
+	resp, err := S3Service.GetObject(params)
+
 	if err != nil {
-		s.Logger.Warnf("Error downlading image: %v", err)
+		if awsErr, ok := err.(awserr.Error); ok {
+			// Generic AWS Error with Code, Message, and original error (if any)
+			fmt.Println(awsErr.Code(), awsErr.Message(), awsErr.OrigErr())
+			if reqErr, ok := err.(awserr.RequestFailure); ok {
+				// A service error occurred
+				s.Logger.Warnf("Error on fetching %v %v %v %v %v", request.Path, reqErr.Code(), reqErr.Message(), reqErr.StatusCode(), reqErr.RequestID())
+				return nil, err
+			}
+		} else {
+			s.Logger.Warnf("%v %v", err.Error(), request.Path)
+			return nil, err
+		}
+	}
+
+	image,err := NewImageFromBuffer(resp.Body)
+	if err != nil {
+
+		s.Logger.Warnf("Unable to create image from response  (url=%v)", request.Path)
 		return nil, err
 	}
-	if httpResponse.StatusCode != 200 {
-		return nil, fmt.Errorf("Error downlading image (url=%v)", httpRequest.URL)
-	}
-	image, err := NewImageFromBuffer(httpResponse.Body)
-	if err != nil {
-		responseBody, _ := ioutil.ReadAll(httpResponse.Body)
-		s.Logger.Warnf("Unable to create image from response body: %v (url=%v)", string(responseBody), httpRequest.URL)
-		return nil, err
-	}
-	s.Logger.Infof("Successfully retrieved image from S3: %v", httpRequest.URL)
+	s.Logger.Infof("Successfully retrieved image from S3: %v %v", request.Path, time.Since(start))
+
 	return image, nil
-}
-
-func (s *S3ImageSource) signedHTTPRequestForRequest(request *ImageSourceOptions) *http.Request {
-	path := s.Config.Directory + request.Path
-	imageURLPathComponents := strings.Split(path, "/")
-
-	for index, component := range imageURLPathComponents {
-		component = url.QueryEscape(component)
-		imageURLPathComponents[index] = component
-	}
-	requestURL := &url.URL{
-		Opaque: strings.Join(imageURLPathComponents, "/"),
-		Scheme: "http",
-		Host:   fmt.Sprintf("%s.s3.amazonaws.com", s.Config.S3Bucket),
-	}
-
-	httpRequest, _ := http.NewRequest("GET", requestURL.RequestURI(), nil)
-	httpRequest.URL = requestURL
-	httpRequest.Header.Set("Date", time.Now().UTC().Format(http.TimeFormat))
-	s3.Sign(httpRequest, s3.Keys{
-		AccessKey: s.Config.S3AccessKey,
-		SecretKey: s.Config.S3SecretKey,
-	})
-
-	return httpRequest
 }
 
 func init() {

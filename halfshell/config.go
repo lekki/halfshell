@@ -211,7 +211,7 @@ func (c *configParser) parseStatterConfig() *StatterConfig {
 }
 
 func (c *configParser) parseSourceConfig(sourceName string) *SourceConfig {
-	return &SourceConfig{
+	config := &SourceConfig{
 		Name:        sourceName,
 		Type:        ImageSourceType(c.stringForKeypath("sources.%s.type", sourceName)),
 		S3AccessKey: c.stringForKeypath("sources.%s.s3_access_key", sourceName),
@@ -220,6 +220,16 @@ func (c *configParser) parseSourceConfig(sourceName string) *SourceConfig {
 		Directory:   c.stringForKeypath("sources.%s.directory", sourceName),
 		Host:        c.stringForKeypath("sources.%s.host", sourceName),
 	}
+
+	if config.S3AccessKey != "" {
+		os.Setenv("AWS_ACCESS_KEY_ID", config.S3AccessKey)
+	}
+
+	if config.S3AccessKey != "" {
+		os.Setenv("AWS_SECRET_ACCESS_KEY", config.S3SecretKey)
+	}
+
+	return config
 }
 
 func (c *configParser) parseProcessorConfig(processorName string) *ProcessorConfig {

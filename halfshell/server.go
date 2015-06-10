@@ -88,7 +88,7 @@ func (s *Server) ImageRequestHandler(w *ResponseWriter, r *Request) {
 
 	cacheControl := r.Route.CacheControl
 	if r.Route.CacheControl == "" {
-		cacheControl = "no-transform,public,max-age=86400,s-maxage=2592000"
+		cacheControl = "no-transform,public,max-age=2592000,s-maxage=2592000"
 	}
 	w.SetHeader("Cache-Control", cacheControl)
 	w.WriteImage(image)
