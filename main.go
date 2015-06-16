@@ -35,6 +35,9 @@ func main() {
 		os.Exit(1)
 	}
 
+	halfshell.InitS3Pool()
+	defer halfshell.CloseS3Pool()
+
 	go halfshell.CacheDeamonRun()
 
 	config := halfshell.NewConfigFromFile(os.Args[1])

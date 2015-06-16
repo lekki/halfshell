@@ -24,11 +24,8 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/service/s3"
-	"os"
 	"fmt"
 )
-
-var S3Service *s3.S3 = s3.New(&aws.Config{Region: "us-east-1", Logger: os.Stdout, LogLevel: 0})
 
 const (
 	ImageSourceTypeS3 ImageSourceType = "s3"
@@ -50,7 +47,6 @@ func NewS3ImageSourceWithConfig(config *SourceConfig) ImageSource {
 
 func (s *S3ImageSource) GetImage(request *ImageSourceOptions) (*Image, error) {
 
-
 	if s.Config.LocalCache {
 
 		content, err := CacheRead(request.Path)
@@ -59,8 +55,15 @@ func (s *S3ImageSource) GetImage(request *ImageSourceOptions) (*Image, error) {
 		}
 	}
 
+	s3Service, err := S3GetFromPool()
+	if err != nil {
+		panic(err)
+	}
+
+	defer S3ReleaseToPool(s3Service)
+
 	params := &s3.GetObjectInput{Bucket: aws.String(s.Config.S3Bucket), Key: aws.String(request.Path)}
-	resp, err := S3Service.GetObject(params)
+	resp, err := s3Service.GetObject(params)
 
 	if awsErr, ok := err.(awserr.Error); ok {
 		// Generic AWS Error with Code, Message, and original error (if any)
