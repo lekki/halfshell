@@ -62,7 +62,7 @@ func CacheWrite(path string, img *Image)  {
 
 func CleanCacheFolder()  {
 
-	cmd := `find `+TMP_FOLDER+` -type d -ctime +10 -exec rm -rf {} \;`
+	cmd := `find `+TMP_FOLDER+` -type d -ctime +3 -exec rm -rf {} \;`
 	fmt.Println(cmd)
 
 	parts := strings.Fields(cmd)
