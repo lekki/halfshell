@@ -21,12 +21,11 @@
 package halfshell
 
 import (
-	"fmt"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/service/s3"
 	"os"
-	"time"
+	"fmt"
 )
 
 var S3Service *s3.S3 = s3.New(&aws.Config{Region: "us-east-1", Logger: os.Stdout, LogLevel: 0})
@@ -41,6 +40,8 @@ type S3ImageSource struct {
 }
 
 func NewS3ImageSourceWithConfig(config *SourceConfig) ImageSource {
+	fmt.Printf("%v", config)
+
 	return &S3ImageSource{
 		Config: config,
 		Logger: NewLogger("source.s3.%s", config.Name),
@@ -49,32 +50,40 @@ func NewS3ImageSourceWithConfig(config *SourceConfig) ImageSource {
 
 func (s *S3ImageSource) GetImage(request *ImageSourceOptions) (*Image, error) {
 
-	start := time.Now()
+
+	if s.Config.LocalCache {
+
+		content, err := CacheRead(request.Path)
+		if content != nil && err == nil {
+			return content, nil
+		}
+	}
+
 	params := &s3.GetObjectInput{Bucket: aws.String(s.Config.S3Bucket), Key: aws.String(request.Path)}
 	resp, err := S3Service.GetObject(params)
 
-	if err != nil {
-		if awsErr, ok := err.(awserr.Error); ok {
-			// Generic AWS Error with Code, Message, and original error (if any)
-			fmt.Println(awsErr.Code(), awsErr.Message(), awsErr.OrigErr())
-			if reqErr, ok := err.(awserr.RequestFailure); ok {
-				// A service error occurred
-				s.Logger.Warnf("Error on fetching %v %v %v %v %v", request.Path, reqErr.Code(), reqErr.Message(), reqErr.StatusCode(), reqErr.RequestID())
-				return nil, err
-			}
+	if awsErr, ok := err.(awserr.Error); ok {
+		// Generic AWS Error with Code, Message, and original error (if any)
+		fmt.Println(awsErr.Code(), awsErr.Message(), awsErr.OrigErr())
+		if reqErr, ok := err.(awserr.RequestFailure); ok {
+					// A service error occurred
+			s.Logger.Warnf("Error on fetching %v %v %v %v %v", request.Path, reqErr.Code(), reqErr.Message(), reqErr.StatusCode(), reqErr.RequestID())
+			return nil, err
 		} else {
 			s.Logger.Warnf("%v %v", err.Error(), request.Path)
 			return nil, err
 		}
 	}
 
-	image,err := NewImageFromBuffer(resp.Body)
+	image, err := NewImageFromBuffer(resp.Body)
 	if err != nil {
-
 		s.Logger.Warnf("Unable to create image from response  (url=%v)", request.Path)
 		return nil, err
 	}
-	s.Logger.Infof("Successfully retrieved image from S3: %v %v", request.Path, time.Since(start))
+
+	if s.Config.LocalCache {
+		CacheWrite(request.Path, image)
+	}
 
 	return image, nil
 }
