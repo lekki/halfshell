@@ -2,5 +2,4 @@
 bin
 *.py[co]
 .idea/*
-halfshell/.idea/scopes/scope_settings.xml
-halfshell/.idea/workspace.xml
+halfshell/.idea/*
