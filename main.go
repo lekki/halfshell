@@ -30,11 +30,12 @@ func main() {
 
 	halfshell.CacheInit()
 
-
 	if len(os.Args) < 2 || os.Args[1] == "" {
 		fmt.Fprintf(os.Stderr, "usage: %s [config]\n", os.Args[0])
 		os.Exit(1)
 	}
+
+	go halfshell.CacheDeamonRun()
 
 	config := halfshell.NewConfigFromFile(os.Args[1])
 	halfshell := halfshell.NewWithConfig(config)

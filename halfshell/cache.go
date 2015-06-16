@@ -5,6 +5,8 @@ import (
 	"time"
 	"fmt"
 	"io/ioutil"
+	"strings"
+	"os/exec"
 )
 
 const TMP_FOLDER string = "/tmp/halfshell"
@@ -56,4 +58,29 @@ func CacheWrite(path string, img *Image)  {
 	}
 
 	fmt.Printf("Successfully update cache: %v %v\n", path, time.Since(start))
+}
+
+func CleanCacheFolder()  {
+
+	cmd := `find `+TMP_FOLDER+` -type d -ctime +10 -exec rm -rf {} \;`
+	fmt.Println(cmd)
+
+	parts := strings.Fields(cmd)
+	head := parts[0]
+	parts = parts[1:len(parts)]
+
+	out, err := exec.Command(head,parts...).Output()
+	if err != nil {
+		fmt.Printf("%s", err)
+	}
+	fmt.Printf("%s", out)
+
+}
+
+func CacheDeamonRun() {
+
+	for {
+		CleanCacheFolder()
+		time.Sleep(1*time.Hour)
+	}
 }
