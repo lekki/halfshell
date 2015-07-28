@@ -35,7 +35,7 @@ func InitS3Pool() {
 func S3Factory() pools.Factory {
 	return func() (pools.Resource, error) {
 		s3Service := new(S3Service)
-		s3Service.s = s3.New(&aws.Config{Region: "us-east-1", Logger: os.Stdout, LogLevel: 0})
+		s3Service.s = s3.New(&aws.Config{Region: aws.String("us-east-1"), LogLevel: 0})
 
 		return s3Service, nil
 	}
